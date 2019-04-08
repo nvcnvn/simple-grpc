@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+message Order {
+    uint64 productID = 1;
+    uint64 quantity = 2;
+}
+
+message OrderRequest {
+    repeated Order purchases = 1;
+}
+
+message OrderResponse {
+    bool successful = 1;
+}
+
+service OrderHandler {
+    rpc MakeOrder(OrderRequest) returns (OrderResponse);
+}
