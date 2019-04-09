@@ -1,0 +1,31 @@
+version: "3"
+services:
+  db:
+    image: cockroachdb/cockroach:v2.1.6
+    command: start --insecure
+  migration:
+    depends_on:
+      - db
+    image: migrate/migrate
+    volumes:
+      - "./scripts/wait-for-db.sh:/wait-for-db.sh"
+      - "./migrations/:/migrations/"
+    entrypoint:
+     - /wait-for-db.sh
+     - db
+     - "./migrate -path=/migrations/ -database cockroachdb://root@db:26257?sslmode=disable -verbose version"
+     - "./migrate -path=/migrations/ -database cockroachdb://root@db:26257?sslmode=disable up"
+  app:
+    depends_on:
+      - db
+      - migration
+    image: golang:1.12.2
+    environment:
+      GO111MODULE: "on"
+      PORT: ":50051"
+    volumes:
+      - "./:/app/"
+    command: /app/scripts/wait-for-db.sh db /app/scripts/run.sh
+    ports:
+      - "50051:50051"
+    

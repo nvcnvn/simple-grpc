@@ -2,7 +2,7 @@ package repositories
 
 // Inventory store in DB
 type Inventory struct {
-	ID         uint
-	StockCount uint
-	Version    uint
+	ID         int64
+	StockCount int64
+	Version    int64
 }

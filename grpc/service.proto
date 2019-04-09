@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package tomshop.v1;
+
 message Order {
     uint64 productID = 1;
     uint64 quantity = 2;
@@ -13,6 +15,6 @@ message OrderResponse {
     bool successful = 1;
 }
 
-service OrderHandler {
+service TomShop {
     rpc MakeOrder(OrderRequest) returns (OrderResponse);
 }
