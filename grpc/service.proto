@@ -3,8 +3,8 @@ syntax = "proto3";
 package tomshop.v1;
 
 message Order {
-    uint64 productID = 1;
-    uint64 quantity = 2;
+    int64 productID = 1;
+    int64 quantity = 2;
 }
 
 message OrderRequest {

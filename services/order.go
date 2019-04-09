@@ -6,6 +6,7 @@ import (
 	pb "tomshop/grpc"
 )
 
+// OrderService implements grpc tomshop.v1.TomShop service
 type OrderService struct{}
 
 // MakeOrder simply rely on repository
