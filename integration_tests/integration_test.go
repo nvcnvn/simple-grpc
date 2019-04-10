@@ -169,15 +169,20 @@ func setupDB(connStr string) *sql.DB {
 		log.Fatal("error connecting to the database: ", err)
 	}
 
-	_, err = db.Exec(`UPSERT INTO inventories VALUES 
-		(11, 10, 0),
-		(12, 5, 0),
-		(21, 10, 0),
-		(22, 5, 0),
-		(31, 10, 0),
-		(32, 5, 0),
-		(41, 10, 0),
-		(21, 5, 0);`)
+	_, err = db.Exec(`INSERT INTO inventories (id, stock_count, version)
+		VALUES 
+			(11, 10, 0),
+			(12, 5, 0),
+			(21, 10, 0),
+			(22, 5, 0),
+			(31, 10, 0),
+			(32, 5, 0),
+			(41, 10, 0),
+			(42, 5, 0)
+		ON CONFLICT (id)
+		DO UPDATE SET
+			stock_count = EXCLUDED.stock_count,
+			version = EXCLUDED.version;`)
 	if err != nil {
 		log.Fatal("error inserting test data to the database: ", err)
 	}
