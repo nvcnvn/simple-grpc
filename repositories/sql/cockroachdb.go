@@ -30,26 +30,27 @@ func NewCockroachRepo(ctx context.Context, db *sql.DB) *CockroachRepo {
 
 // AdjustInventories checks optimistic lock using Inventory.Version and will not commit changes
 // if any item failed to store
-func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) error {
+func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) (txnErr error) {
+	if len(inventories) == 0 {
+		return nil
+	}
+
 	tx, err := r.txnFactory(&sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return err
 	}
 
-	var (
-		txnErr error
-		stmt   Executor
-	)
+	var stmt Executor
 	stmt, txnErr = r.stmtFactory(tx, "UPDATE repositories SET stock_count = ? WHERE id = ? AND version = ?")
-	if err != nil {
-		return txnErr
+	if txnErr != nil {
+		return
 	}
 	defer func() {
 		stmt.Close()
 		if p := recover(); p != nil {
 			tx.Rollback()
 			panic(p)
-		} else if err != nil {
+		} else if txnErr != nil {
 			tx.Rollback()
 		} else {
 			txnErr = tx.Commit()
@@ -61,22 +62,25 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 		var result sql.Result
 		result, txnErr = stmt.ExecContext(r.ctx, inventory.ProductID, inventory.StockCount, inventory.Version)
 		if txnErr != nil {
-			return txnErr
+			return
 		}
 
 		var n int64
 		n, txnErr = result.RowsAffected()
 		if txnErr != nil {
-			return txnErr
+			return
 		}
 
 		if n == 0 {
-			txnErr = fmt.Errorf("cannot modify stock quantity for product %d", inventory.ProductID)
-			return txnErr
+			txnErr = &inventoryAdjustError{
+				error:     fmt.Errorf("cannot modify stock quantity for product"),
+				productID: inventory.ProductID,
+			}
+			return
 		}
 	}
 
-	return txnErr
+	return
 }
 
 // TransactionManager implemented by sql.Tx
@@ -89,4 +93,13 @@ type TransactionManager interface {
 type Executor interface {
 	ExecContext(context.Context, ...interface{}) (sql.Result, error)
 	Close() error
+}
+
+type inventoryAdjustError struct {
+	error
+	productID int64
+}
+
+func (e *inventoryAdjustError) ProductID() int64 {
+	return e.productID
 }
