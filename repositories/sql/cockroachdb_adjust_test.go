@@ -47,12 +47,12 @@ func errorWhenStartTxn(tt *testing.T) {
 }
 
 func errorWhenPrepareStatement(tt *testing.T) {
-	dummyErr := fmt.Errorf("dummy stmtFactory error")
+	dummyErr := fmt.Errorf("dummy executorFactory error")
 	r := &CockroachRepo{
 		txnFactory: func(opts *sql.TxOptions) (TransactionManager, error) {
 			return &sql.Tx{}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return nil, dummyErr
 		},
 	}
@@ -68,7 +68,7 @@ func inputEmptyNilError(tt *testing.T) {
 		txnFactory: func(opts *sql.TxOptions) (TransactionManager, error) {
 			return &sql.Tx{}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return &sql.Stmt{}, nil
 		},
 	}
@@ -94,7 +94,7 @@ func execContextWithCorrectArgs(tt *testing.T) {
 				},
 			}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return mockExecutor{
 				execContext: func(c context.Context, args ...interface{}) (sql.Result, error) {
 					if len(args) > 3 {
@@ -184,7 +184,7 @@ func errorInExecContext(tt *testing.T) {
 				},
 			}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return mockExecutor{
 				execContext: func(c context.Context, args ...interface{}) (sql.Result, error) {
 					expectedFnCall["execContext"].called++
@@ -250,7 +250,7 @@ func panicInExecContext(tt *testing.T) {
 				},
 			}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return mockExecutor{
 				execContext: func(c context.Context, args ...interface{}) (sql.Result, error) {
 					expectedFnCall["execContext"].called++
@@ -309,7 +309,7 @@ func rollBackWhenNoRowUpdated(tt *testing.T) {
 				},
 			}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return mockExecutor{
 				execContext: func(c context.Context, args ...interface{}) (sql.Result, error) {
 					expectedFnCall["execContext"].called++
@@ -384,7 +384,7 @@ func errorWhenCommitError(tt *testing.T) {
 				},
 			}, nil
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return mockExecutor{
 				execContext: func(c context.Context, args ...interface{}) (sql.Result, error) {
 					expectedFnCall["execContext"].called++
@@ -451,13 +451,13 @@ func (r mockSQLResult) LastInsertId() (int64, error) {
 func (r mockSQLResult) RowsAffected() (int64, error) {
 	return r.rowsAffected()
 }
-func TestNewCockroachRepoStmtFactory(t *testing.T) {
+func TestNewCockroachRepoexecutorFactory(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("stmtFactory must panic if recieved dummy TransactionManager")
+			t.Errorf("executorFactory must panic if recieved dummy TransactionManager")
 		}
 	}()
 
 	r := NewCockroachRepo(context.Background(), nil)
-	r.stmtFactory(TransactionManager(nil), "test")
+	r.executorFactory(TransactionManager(nil), "test")
 }

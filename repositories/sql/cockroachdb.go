@@ -6,13 +6,16 @@ import (
 	"fmt"
 
 	"tomshop/repositories"
+
+	"github.com/lib/pq"
 )
 
 // CockroachRepo built for CockroachDB in mind but can worl pretty well with any SQL DBMS
 type CockroachRepo struct {
-	txnFactory  func(*sql.TxOptions) (TransactionManager, error)
-	stmtFactory func(TransactionManager, string) (Executor, error)
-	ctx         context.Context
+	txnFactory      func(*sql.TxOptions) (TransactionManager, error)
+	executorFactory func(TransactionManager, string) (Executor, error)
+	querier         Querier
+	ctx             context.Context
 }
 
 // NewCockroachRepo with sql.DB, ctx must be request scope
@@ -21,10 +24,11 @@ func NewCockroachRepo(ctx context.Context, db *sql.DB) *CockroachRepo {
 		txnFactory: func(opts *sql.TxOptions) (TransactionManager, error) {
 			return db.BeginTx(ctx, opts)
 		},
-		stmtFactory: func(tm TransactionManager, query string) (Executor, error) {
+		executorFactory: func(tm TransactionManager, query string) (Executor, error) {
 			return tm.(*sql.Tx).PrepareContext(ctx, query)
 		},
-		ctx: ctx,
+		querier: db,
+		ctx:     ctx,
 	}
 }
 
@@ -41,7 +45,7 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 	}
 
 	var stmt Executor
-	stmt, txnErr = r.stmtFactory(tx, "UPDATE repositories SET stock_count = ? WHERE id = ? AND version = ?")
+	stmt, txnErr = r.executorFactory(tx, "UPDATE inventories SET stock_count = ? WHERE id = ? AND version = ?")
 	if txnErr != nil {
 		return
 	}
@@ -83,6 +87,30 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 	return
 }
 
+// ListInventories by ID, omit items that not in DB
+func (r *CockroachRepo) ListInventories(ctx context.Context, IDs []int64) ([]repositories.Inventory, error) {
+	rows, err := r.querier.QueryContext(ctx, "SELECT id, stock_count, version FROM inventories WHERE id IN (?)", pq.Array(IDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]repositories.Inventory, 0, len(IDs))
+	for rows.Next() {
+		inv := repositories.Inventory{}
+		if err := rows.Scan(&inv.ProductID, &inv.StockCount, &inv.Version); err != nil {
+			return nil, err
+		}
+		results = append(results, inv)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
 // TransactionManager implemented by sql.Tx
 type TransactionManager interface {
 	Rollback() error
@@ -93,6 +121,11 @@ type TransactionManager interface {
 type Executor interface {
 	ExecContext(context.Context, ...interface{}) (sql.Result, error)
 	Close() error
+}
+
+// Querier implemented by sql.Stmt
+type Querier interface {
+	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 }
 
 type inventoryAdjustError struct {
