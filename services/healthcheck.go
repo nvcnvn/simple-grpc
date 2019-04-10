@@ -8,8 +8,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// HealthcheckService implement gRPC Healthcheck standard
 type HealthcheckService struct{}
 
+// Check will ensure migration already success
 func (*HealthcheckService) Check(context.Context, *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
 	return &health.HealthCheckResponse{
 		Status: health.HealthCheckResponse_SERVING,
