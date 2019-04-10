@@ -44,8 +44,9 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 		return err
 	}
 
+	updateStmt := "UPDATE inventories SET stock_count = $1, version = version + 1 WHERE id = $2 AND version = $3"
 	var stmt Executor
-	stmt, txnErr = r.executorFactory(tx, "UPDATE inventories SET stock_count = ? WHERE id = ? AND version = ?")
+	stmt, txnErr = r.executorFactory(tx, updateStmt)
 	if txnErr != nil {
 		return
 	}
@@ -64,7 +65,7 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 	// update one by one... yes
 	for _, inventory := range inventories {
 		var result sql.Result
-		result, txnErr = stmt.ExecContext(r.ctx, inventory.ProductID, inventory.StockCount, inventory.Version)
+		result, txnErr = stmt.ExecContext(r.ctx, inventory.StockCount, inventory.ProductID, inventory.Version)
 		if txnErr != nil {
 			return
 		}
@@ -77,7 +78,7 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 
 		if n == 0 {
 			txnErr = &inventoryAdjustError{
-				error:     fmt.Errorf("cannot modify stock quantity for product"),
+				error:     fmt.Errorf("cannot modify stock quantity for product %d", inventory.ProductID),
 				productID: inventory.ProductID,
 			}
 			return
@@ -89,7 +90,7 @@ func (r *CockroachRepo) AdjustInventories(inventories []repositories.Inventory) 
 
 // ListInventories by ID, omit items that not in DB
 func (r *CockroachRepo) ListInventories(ctx context.Context, IDs []int64) ([]repositories.Inventory, error) {
-	rows, err := r.querier.QueryContext(ctx, "SELECT id, stock_count, version FROM inventories WHERE id IN (?)", pq.Array(IDs))
+	rows, err := r.querier.QueryContext(ctx, "SELECT id, stock_count, version FROM inventories WHERE id = ANY ($1)", pq.Array(IDs))
 	if err != nil {
 		return nil, err
 	}

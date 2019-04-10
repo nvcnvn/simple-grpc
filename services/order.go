@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"log"
 
 	pb "tomshop/grpc"
 	"tomshop/repositories"
@@ -16,9 +17,19 @@ var (
 
 // OrderService implements grpc tomshop.v1.TomShop service
 type OrderService struct {
-	Repo interface {
-		ListInventories(context.Context, []int64) ([]repositories.Inventory, error)
-		AdjustInventories([]repositories.Inventory) error
+	repoFactory func(ctx context.Context) Repo
+}
+
+// Repo implemented by repositories/sql
+type Repo interface {
+	ListInventories(context.Context, []int64) ([]repositories.Inventory, error)
+	AdjustInventories([]repositories.Inventory) error
+}
+
+// NewOrderService simply returns new OrderService
+func NewOrderService(repoFactory func(ctx context.Context) Repo) *OrderService {
+	return &OrderService{
+		repoFactory: repoFactory,
 	}
 }
 
@@ -31,7 +42,8 @@ func (s *OrderService) MakeOrder(ctx context.Context, in *pb.OrderRequest) (*pb.
 		purchaseMap[order.ProductID] = order.Quantity
 	}
 
-	availableInventories, err := s.Repo.ListInventories(ctx, ids)
+	repo := s.repoFactory(ctx)
+	availableInventories, err := repo.ListInventories(ctx, ids)
 	if err != nil {
 		return &pb.OrderResponse{
 			Successful: false,
@@ -39,6 +51,7 @@ func (s *OrderService) MakeOrder(ctx context.Context, in *pb.OrderRequest) (*pb.
 	}
 
 	if len(availableInventories) != len(in.Purchases) {
+		log.Println("not enough products")
 		return &pb.OrderResponse{
 			Successful: false,
 		}, notEnoughStockErr
@@ -47,6 +60,12 @@ func (s *OrderService) MakeOrder(ctx context.Context, in *pb.OrderRequest) (*pb.
 	for i := range availableInventories {
 		requestQty := purchaseMap[availableInventories[i].ProductID]
 		if requestQty > availableInventories[i].StockCount {
+			log.Printf(
+				"not enough items for product %d, reuested: %d, available: %d",
+				availableInventories[i].ProductID,
+				requestQty,
+				availableInventories[i].StockCount,
+			)
 			return &pb.OrderResponse{
 				Successful: false,
 			}, notEnoughStockErr
@@ -54,7 +73,7 @@ func (s *OrderService) MakeOrder(ctx context.Context, in *pb.OrderRequest) (*pb.
 		availableInventories[i].StockCount -= requestQty
 	}
 
-	err = s.Repo.AdjustInventories(availableInventories)
+	err = repo.AdjustInventories(availableInventories)
 	if err != nil {
 		return &pb.OrderResponse{
 			Successful: false,

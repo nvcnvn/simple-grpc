@@ -23,9 +23,19 @@ services:
     environment:
       GO111MODULE: "on"
       PORT: ":50051"
+      DATABASE_ADDR: postgresql://root@db:26257?sslmode=disable
     volumes:
       - "./:/app/"
     command: /app/scripts/wait-for-db.sh db /app/scripts/run.sh
     ports:
       - "50051:50051"
-    
+  integration_tests:
+    image: golang:1.12.2
+    environment:
+      GO111MODULE: "on"
+      DATABASE_ADDR: postgresql://root@db:26257?sslmode=disable
+      APP_ADDR: "app:50051"
+    volumes:
+      - "./:/app/"
+    command: go test -count=1 ./integration_tests
+    working_dir: /app/
