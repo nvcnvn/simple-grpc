@@ -42,6 +42,10 @@ func TestRunner(t *testing.T) {
 	t.Run("example 4: 2 concurent request, only one can be fullfil", func(tt *testing.T) {
 		concurrentRequestsOnlyOneOK(c, db, tt)
 	})
+
+	t.Run("order with negative stock", func(tt *testing.T) {
+		orderWithNegativeStock(c, db, tt)
+	})
 }
 
 // example 1 (details can be found in Manabie Senior Golang BE Coding Challenge)
@@ -94,6 +98,23 @@ func outOfStock(c pb.TomShopClient, db *sql.DB, t *testing.T) {
 
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Error("expecting gRPC FailedPrecondition error, got", err)
+	}
+}
+
+func orderWithNegativeStock(c pb.TomShopClient, db *sql.DB, t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := c.MakeOrder(ctx, &pb.OrderRequest{
+		Purchases: []*pb.Order{
+			&pb.Order{
+				ProductID: 21,
+				Quantity:  -2,
+			},
+		},
+	})
+
+	if status.Code(err) != codes.InvalidArgument {
+		t.Error("expecting gRPC InvalidArgument error, got", err)
 	}
 }
 

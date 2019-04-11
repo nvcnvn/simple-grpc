@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	notEnoughStockErr = status.Error(codes.FailedPrecondition, "not enough stock to fullfil order")
+	notEnoughStockErr  = status.Error(codes.FailedPrecondition, "not enough stock to fullfil order")
+	invalidOrderQtyErr = status.Error(codes.InvalidArgument, "invalid quantity for order")
 )
 
 // OrderService implements grpc tomshop.v1.TomShop service
@@ -54,7 +55,7 @@ func (s *OrderService) MakeOrder(ctx context.Context, in *pb.OrderRequest) (*pb.
 		if requestQty <= 0 {
 			return &pb.OrderResponse{
 				Successful: false,
-			}, notEnoughStockErr
+			}, invalidOrderQtyErr
 		}
 
 		if requestQty > availableInventories[i].StockCount {

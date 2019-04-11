@@ -21,6 +21,8 @@ func TestOrderService_MakeOrder(t *testing.T) {
 		errorWhenAvailableInventoriesMissingProduct)
 	t.Run("expecting gRPC FailedPrecondition error if products don't have enough items",
 		errorWhenAvailableInventoriesNotEnough)
+	t.Run("expecting gRPC InvalidArgument error if request negative qty",
+		errorWhenRequestNegativeQty)
 }
 
 func errorWhenListInventories(t *testing.T) {
@@ -158,6 +160,37 @@ func errorWhenAvailableInventoriesNotEnough(t *testing.T) {
 
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Error("expecting gRPC FailedPrecondition error, got", err)
+	}
+
+	if resp.Successful {
+		t.Error("expecting failed response, got", resp)
+	}
+}
+
+func errorWhenRequestNegativeQty(t *testing.T) {
+	s := &OrderService{
+		Repo: mockRepo{
+			listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
+				return []repositories.Inventory{
+					{
+						ProductID:  1,
+						StockCount: 11},
+				}, nil
+			},
+		},
+	}
+
+	resp, err := s.MakeOrder(context.Background(), &pb.OrderRequest{
+		Purchases: []*pb.Order{
+			{
+				ProductID: 1,
+				Quantity:  -1,
+			},
+		},
+	})
+
+	if status.Code(err) != codes.InvalidArgument {
+		t.Error("expecting gRPC InvalidArgument error, got", err)
 	}
 
 	if resp.Successful {
