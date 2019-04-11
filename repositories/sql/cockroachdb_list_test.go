@@ -15,7 +15,7 @@ func TestCockroachRepo_ListInventories(t *testing.T) {
 	r := &CockroachRepo{
 		querier: mockQuerier{
 			t:              t,
-			expectingQuery: "SELECT id, stock_count, version FROM inventories WHERE id IN ($1)",
+			expectingQuery: "SELECT id, stock_count FROM inventories WHERE id = ANY ($1)",
 			expectingArgs: []interface{}{
 				pq.Array(ids),
 			},

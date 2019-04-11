@@ -38,6 +38,10 @@ func TestRunner(t *testing.T) {
 	t.Run("senario 3: 2 concurent request, both can be fullfil", func(tt *testing.T) {
 		concurrentRequestsBothOK(c, db, tt)
 	})
+
+	t.Run("example 4: 2 concurent request, only one can be fullfil", func(tt *testing.T) {
+		concurrentRequestsOnlyOneOK(c, db, tt)
+	})
 }
 
 // example 1 (details can be found in Manabie Senior Golang BE Coding Challenge)
@@ -148,6 +152,66 @@ func concurrentRequestsBothOK(c pb.TomShopClient, db *sql.DB, t *testing.T) {
 	checkUpdatedQty(db, t, 32, 2)
 }
 
+// example 4
+func concurrentRequestsOnlyOneOK(c pb.TomShopClient, db *sql.DB, t *testing.T) {
+	waitChn1, waitChn2 := make(chan bool), make(chan bool)
+	var err1, err2 error
+	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel1()
+	go func() {
+		_, err1 = c.MakeOrder(ctx1, &pb.OrderRequest{
+			Purchases: []*pb.Order{
+				&pb.Order{
+					ProductID: 41,
+					Quantity:  2,
+				},
+				&pb.Order{
+					ProductID: 42,
+					Quantity:  1,
+				},
+			},
+		})
+		waitChn1 <- true
+	}()
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel2()
+	go func() {
+		_, err2 = c.MakeOrder(ctx2, &pb.OrderRequest{
+			Purchases: []*pb.Order{
+				&pb.Order{
+					ProductID: 41,
+					Quantity:  1,
+				},
+				&pb.Order{
+					ProductID: 42,
+					Quantity:  5,
+				},
+			},
+		})
+		waitChn2 <- true
+	}()
+
+	<-waitChn1
+	<-waitChn2
+
+	if err1 == nil && err2 == nil {
+		t.Error("expecting atleast one call failed")
+	}
+
+	if err1 != nil {
+		t.Log("getting error for call 1", err1)
+		checkUpdatedQty(db, t, 41, 9)
+		checkUpdatedQty(db, t, 42, 0)
+	}
+
+	if err2 != nil {
+		t.Log("getting error for call 2", err2)
+		checkUpdatedQty(db, t, 41, 8)
+		checkUpdatedQty(db, t, 42, 4)
+	}
+}
+
 func checkUpdatedQty(db *sql.DB, t *testing.T, productID, expectedQty int64) {
 	var currentQty int64
 	err := db.QueryRow(
@@ -177,7 +241,7 @@ func setupDB(connStr string) *sql.DB {
 		(31, 10, 0),
 		(32, 5, 0),
 		(41, 10, 0),
-		(21, 5, 0);`)
+		(42, 5, 0);`)
 	if err != nil {
 		log.Fatal("error inserting test data to the database: ", err)
 	}

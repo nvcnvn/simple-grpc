@@ -13,7 +13,6 @@ services:
     entrypoint:
      - /wait-for-db.sh
      - db
-     - "./migrate -path=/migrations/ -database cockroachdb://root@db:26257?sslmode=disable -verbose version"
      - "./migrate -path=/migrations/ -database cockroachdb://root@db:26257?sslmode=disable up"
   app:
     depends_on:

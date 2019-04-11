@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"net"
@@ -38,9 +37,10 @@ func main() {
 		log.Fatal("error connecting to the database: ", err)
 	}
 
-	pb.RegisterTomShopServer(s, services.NewOrderService(func(ctx context.Context) services.Repo {
-		return repo.NewCockroachRepo(ctx, db)
-	}))
+	// manual dependencies injection still work
+	pb.RegisterTomShopServer(s, &services.OrderService{
+		Repo: repo.NewCockroachRepo(db),
+	})
 
 	health.RegisterHealthServer(s, &services.HealthcheckService{})
 

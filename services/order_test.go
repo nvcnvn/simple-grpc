@@ -25,12 +25,10 @@ func TestOrderService_MakeOrder(t *testing.T) {
 
 func errorWhenListInventories(t *testing.T) {
 	s := &OrderService{
-		repoFactory: func(context.Context) Repo {
-			return mockRepo{
-				listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
-					return nil, fmt.Errorf("dummyListInventoriesError")
-				},
-			}
+		Repo: mockRepo{
+			listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
+				return nil, fmt.Errorf("dummyListInventoriesError")
+			},
 		},
 	}
 
@@ -54,21 +52,19 @@ func errorWhenListInventories(t *testing.T) {
 
 func errorWhenAdjustInventories(t *testing.T) {
 	s := &OrderService{
-		repoFactory: func(context.Context) Repo {
-			return mockRepo{
-				listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
-					return []repositories.Inventory{
-						{
-							ProductID:  1,
-							StockCount: 11,
-							Version:    111,
-						},
-					}, nil
-				},
-				adjustInventories: func([]repositories.Inventory) error {
-					return fmt.Errorf("dummyAdjustInventoriesError")
-				},
-			}
+		Repo: mockRepo{
+			listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
+				return []repositories.Inventory{
+					{
+						ProductID:  1,
+						StockCount: 11,
+						Version:    111,
+					},
+				}, nil
+			},
+			adjustInventories: func(context.Context, []repositories.Order) error {
+				return fmt.Errorf("dummyAdjustInventoriesError")
+			},
 		},
 	}
 
@@ -92,18 +88,16 @@ func errorWhenAdjustInventories(t *testing.T) {
 
 func errorWhenAvailableInventoriesMissingProduct(t *testing.T) {
 	s := &OrderService{
-		repoFactory: func(context.Context) Repo {
-			return mockRepo{
-				listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
-					return []repositories.Inventory{
-						{
-							ProductID:  1,
-							StockCount: 11,
-							Version:    111,
-						},
-					}, nil
-				},
-			}
+		Repo: mockRepo{
+			listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
+				return []repositories.Inventory{
+					{
+						ProductID:  1,
+						StockCount: 11,
+						Version:    111,
+					},
+				}, nil
+			},
 		},
 	}
 
@@ -131,23 +125,21 @@ func errorWhenAvailableInventoriesMissingProduct(t *testing.T) {
 
 func errorWhenAvailableInventoriesNotEnough(t *testing.T) {
 	s := &OrderService{
-		repoFactory: func(context.Context) Repo {
-			return mockRepo{
-				listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
-					return []repositories.Inventory{
-						{
-							ProductID:  1,
-							StockCount: 11,
-							Version:    111,
-						},
-						{
-							ProductID:  2,
-							StockCount: 21,
-							Version:    222,
-						},
-					}, nil
-				},
-			}
+		Repo: mockRepo{
+			listInventories: func(context.Context, []int64) ([]repositories.Inventory, error) {
+				return []repositories.Inventory{
+					{
+						ProductID:  1,
+						StockCount: 11,
+						Version:    111,
+					},
+					{
+						ProductID:  2,
+						StockCount: 21,
+						Version:    222,
+					},
+				}, nil
+			},
 		},
 	}
 
@@ -175,13 +167,13 @@ func errorWhenAvailableInventoriesNotEnough(t *testing.T) {
 
 type mockRepo struct {
 	listInventories   func(context.Context, []int64) ([]repositories.Inventory, error)
-	adjustInventories func([]repositories.Inventory) error
+	adjustInventories func(context.Context, []repositories.Order) error
 }
 
 func (r mockRepo) ListInventories(ctx context.Context, ids []int64) ([]repositories.Inventory, error) {
 	return r.listInventories(ctx, ids)
 }
 
-func (r mockRepo) AdjustInventories(i []repositories.Inventory) error {
-	return r.adjustInventories(i)
+func (r mockRepo) AdjustInventories(ctx context.Context, i []repositories.Order) error {
+	return r.adjustInventories(ctx, i)
 }
